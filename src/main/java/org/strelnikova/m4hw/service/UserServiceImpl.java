@@ -10,6 +10,7 @@ import org.strelnikova.m4hw.controller.dto.UserResponseDTO;
 import org.strelnikova.m4hw.exception.UserNotFoundException;
 import org.strelnikova.m4hw.model.User;
 import org.strelnikova.m4hw.repository.UserRepository;
+import org.strelnikova.m4hw.validation.UserValidator;
 
 import java.util.List;
 import java.util.UUID;
@@ -17,9 +18,12 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class UserServiceImpl implements UserService{
+
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final UserValidator userValidator;
 
     @Override
     public List<UserResponseDTO> getAllUsers() {
@@ -41,6 +45,10 @@ public class UserServiceImpl implements UserService{
     @Transactional
     public UserResponseDTO createUser(UserRequestDTO requestDTO) {
         log.info("Creating new user: {}", requestDTO);
+        userValidator.validate(requestDTO);
+
+        checkEmailUnique(requestDTO.email(), null);
+
         User user = userMapper.requestDTOToUser(requestDTO);
         User savedUser = userRepository.save(user);
         log.info("User created with id: {}", savedUser.getId());
@@ -51,8 +59,13 @@ public class UserServiceImpl implements UserService{
     @Transactional
     public UserResponseDTO updateUser(UUID id, UserRequestDTO requestDTO) {
         log.info("Updating user with id: {}", id);
+
+        userValidator.validate(requestDTO);
+
         User existingUser = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
+
+        checkEmailUnique(requestDTO.email(), existingUser.getEmail());
 
         existingUser.setName(requestDTO.name());
         existingUser.setEmail(requestDTO.email());
@@ -72,5 +85,14 @@ public class UserServiceImpl implements UserService{
         }
         userRepository.deleteById(id);
         log.info("User deleted: {}", id);
+    }
+
+    private void checkEmailUnique(String newEmail, String currentEmail) {
+        if (currentEmail != null && currentEmail.equals(newEmail)) {
+            return;
+        }
+        if (userRepository.existsByEmail(newEmail)) {
+            throw new IllegalArgumentException("Email already in use: " + newEmail);
+        }
     }
 }

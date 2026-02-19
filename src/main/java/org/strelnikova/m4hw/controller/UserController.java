@@ -45,14 +45,14 @@ public class UserController {
     public ResponseEntity<UserResponseDTO> updateUser(
             @PathVariable("id") UUID id,
             @RequestBody UserRequestDTO requestDTO) {
-        log.info("User with id {} updated", id);
+        log.info("Updating user with id {}", id);
         UserResponseDTO updatedUser = userService.updateUser(id, requestDTO);
         return ResponseEntity.ok(updatedUser);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable("id") UUID id) {
-        log.info("User with id {} removed", id);
+        log.info("Deleting user with id {}", id);
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
