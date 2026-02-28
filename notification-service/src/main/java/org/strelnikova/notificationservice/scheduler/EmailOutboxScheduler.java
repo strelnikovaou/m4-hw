@@ -1,6 +1,5 @@
 package org.strelnikova.notificationservice.scheduler;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -15,7 +14,6 @@ import org.strelnikova.notificationservice.service.NotificationMessageBuilder.Em
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class EmailOutboxScheduler {
 
@@ -26,7 +24,15 @@ public class EmailOutboxScheduler {
     private static final int MAX_ATTEMPTS = 5;
 
     @Lazy
-    private final EmailOutboxScheduler self; // что-бы @Transactional метода отрабатывал корректно
+    private final EmailOutboxScheduler self;
+
+    public EmailOutboxScheduler(EmailOutboxRepository outboxRepository,
+                                EmailService emailService,
+                                @Lazy EmailOutboxScheduler self) {
+        this.outboxRepository = outboxRepository;
+        this.emailService = emailService;
+        this.self = self;
+    }
 
     @Scheduled(fixedDelay = 10000) // каждые 10 секунд
     public void processOutbox() {
@@ -44,11 +50,9 @@ public class EmailOutboxScheduler {
     @Transactional
     protected void processEmail(EmailOutbox email) {
         try {
-            // Пытаемся отправить
             EmailData emailData = new EmailData(email.getToEmail(), email.getSubject(), email.getBody());
             emailService.sendEmail(emailData);
 
-            // Успех – помечаем как SENT
             markAsSent(email);
         } catch (Exception e) {
             log.warn("Failed to send email to {}, attempts: {}", email.getToEmail(), email.getAttempts(), e);
@@ -58,14 +62,13 @@ public class EmailOutboxScheduler {
 
     private void markAsSent(EmailOutbox email) {
         email.setStatus(EmailStatus.SENT);
-        outboxRepository.save(email); // версия увеличится автоматически
+        outboxRepository.save(email);
     }
 
     private void handleFailure(EmailOutbox email) {
         int newAttempts = email.getAttempts() + 1;
         EmailStatus newStatus = newAttempts >= MAX_ATTEMPTS ? EmailStatus.FAILED : EmailStatus.PENDING;
 
-        // Обновляем с проверкой версии (оптимистическая блокировка)
         int updated = outboxRepository.updateStatusAndAttempts(
                 email.getId(),
                 newStatus,
