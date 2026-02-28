@@ -1,9 +1,8 @@
 package org.strelnikova.userservice.service;
 
- import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
- import org.springframework.context.annotation.Lazy;
- import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,24 +11,32 @@ import org.strelnikova.userservice.model.outbox.OutboxEvent;
 import org.strelnikova.userservice.model.outbox.OutboxStatus;
 import org.strelnikova.userservice.model.outbox.dto.UserEventPayload;
 import org.strelnikova.userservice.repository.OutboxEventRepository;
- import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
- import java.util.List;
- import java.util.UUID;
+import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
+
 public class OutboxProcessor {
 
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaUserService kafkaUserService;
     private final ObjectMapper objectMapper;
+    private final OutboxProcessor self;
 
-    @Lazy
-    private final OutboxProcessor self; // что-бы @Transactional метода отрабатывал корректно
+    public OutboxProcessor(OutboxEventRepository outboxEventRepository,
+                           KafkaUserService kafkaUserService,
+                           ObjectMapper objectMapper,
+                           @Lazy OutboxProcessor self) {
+        this.outboxEventRepository = outboxEventRepository;
+        this.kafkaUserService = kafkaUserService;
+        this.objectMapper = objectMapper;
+        this.self = self;
+    }
 
-    @Scheduled(fixedDelay = 5000) // каждые 5 секунд
+    @Scheduled(fixedDelay = 5000)
     public void processOutboxEvents() {
         List<OutboxEvent> pendingEvents = outboxEventRepository.findPendingEvents();
         log.info("Found {} pending outbox events", pendingEvents.size());
