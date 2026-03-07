@@ -14,8 +14,11 @@ import org.strelnikova.userservice.controller.dto.UserResponseDTO;
 import org.strelnikova.userservice.exception.UserNotFoundException;
 import org.strelnikova.userservice.exception.ValidationException;
 import org.strelnikova.userservice.model.User;
+import org.strelnikova.userservice.model.outbox.OutboxEvent;
+import org.strelnikova.userservice.repository.OutboxEventRepository;
 import org.strelnikova.userservice.repository.UserRepository;
 import org.strelnikova.userservice.validation.UserValidator;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -46,6 +49,12 @@ public class UserServiceTest {
 
     @InjectMocks
     private UserServiceImpl userService;
+
+    @Mock
+    private OutboxEventRepository outboxEventRepository;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
 
     @Nested
@@ -166,11 +175,12 @@ public class UserServiceTest {
                     new User(NEW_NAME, NEW_EMAIL, NEW_AGE)
             ));
 
-            when(userMapper.userToResponseDTO(any(User.class)))
-                    .thenReturn(
+            when(userMapper.usersToResponseDTOs(anyList()))
+                    .thenReturn(List.of(
                             new UserResponseDTO(id1, TEST_NAME, TEST_EMAIL, TEST_AGE, now),
                             new UserResponseDTO(id2, NEW_NAME, NEW_EMAIL, NEW_AGE, now)
-                    );
+                    ));
+
 
             List<UserResponseDTO> result = userService.getAllUsers();
 
@@ -250,13 +260,16 @@ public class UserServiceTest {
         @DisplayName("Should delete existing user")
         void shouldDeleteUser() {
             UUID id = UUID.randomUUID();
-
-            when(userRepository.existsById(id)).thenReturn(true);
-            doNothing().when(userRepository).deleteById(id);
+            User user = new User(TEST_NAME, TEST_EMAIL, TEST_AGE);
+            when(userRepository.findById(id)).thenReturn(Optional.of(user));
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+            when(outboxEventRepository.save(any(OutboxEvent.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
 
             assertThatCode(() -> userService.deleteUser(id)).doesNotThrowAnyException();
 
             verify(userRepository).deleteById(id);
+            verify(outboxEventRepository).save(any(OutboxEvent.class));
         }
 
         @Test
@@ -264,10 +277,13 @@ public class UserServiceTest {
         void shouldThrowWhenNotFound() {
             UUID id = UUID.randomUUID();
 
-            when(userRepository.existsById(id)).thenReturn(false);
+            when(userRepository.findById(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> userService.deleteUser(id))
                     .isInstanceOf(UserNotFoundException.class);
+
+            verify(userRepository, never()).deleteById(any());
+            verify(outboxEventRepository, never()).save(any());
         }
     }
 

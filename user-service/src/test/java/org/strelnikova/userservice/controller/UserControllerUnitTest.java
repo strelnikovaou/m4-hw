@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -42,7 +44,6 @@ class UserControllerUnitTest {
     @Test
     @DisplayName("GET /api/users - should return list of users")
     void getAllUsers() throws Exception {
-
         UserResponseDTO user1 = new UserResponseDTO(
                 UUID.randomUUID(), "John", "john@example.com", 30, OffsetDateTime.now());
         UserResponseDTO user2 = new UserResponseDTO(
@@ -52,9 +53,12 @@ class UserControllerUnitTest {
 
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].name", is("John")))
-                .andExpect(jsonPath("$[1].name", is("Jane")));
+
+                .andExpect(jsonPath("$._embedded.userResponseDTOList").isArray())
+                .andExpect(jsonPath("$._embedded.userResponseDTOList.length()").value(2))
+                .andExpect(jsonPath("$._embedded.userResponseDTOList[0].name").value("John"))
+                .andExpect(jsonPath("$._embedded.userResponseDTOList[1].name").value("Jane"))
+                .andExpect(jsonPath("$._links.self.href").exists());
 
         verify(userService, times(1)).getAllUsers();
     }
