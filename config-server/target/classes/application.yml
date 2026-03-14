@@ -1,0 +1,20 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/strelnikovaou/m4-hw
+          default-label: main
+          search-paths: config
+
+#eureka:
+#  client:
+#    serviceUrl:
+#      defaultZone: http://discovery-server:8761/eureka/
+#    register-with-eureka: true
+#    fetch-registry: true
